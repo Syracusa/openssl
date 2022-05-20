@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -23,6 +23,7 @@
 #include "prov/seeding.h"
 #include "self_test.h"
 #include "crypto/context.h"
+#include "internal/core.h"
 
 static const char FIPS_DEFAULT_PROPERTIES[] = "provider=fips,fips=yes";
 static const char FIPS_UNAPPROVED_PROPERTIES[] = "provider=fips,fips=no";
@@ -482,6 +483,7 @@ static void fips_teardown(void *provctx)
 {
     OSSL_LIB_CTX_free(PROV_LIBCTX_OF(provctx));
     ossl_prov_ctx_free(provctx);
+    ossl_deinit_casecmp();
 }
 
 static void fips_intern_teardown(void *provctx)
@@ -539,8 +541,10 @@ int OSSL_provider_init_int(const OSSL_CORE_HANDLE *handle,
 
     memset(&selftest_params, 0, sizeof(selftest_params));
 
-    if (!ossl_prov_seeding_from_dispatch(in))
+    if (!ossl_init_casecmp_int())
         return 0;
+    if (!ossl_prov_seeding_from_dispatch(in))
+        goto err;
     for (; in->function_id != 0; in++) {
         /*
          * We do not support the scenario of an application linked against
